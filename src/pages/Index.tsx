@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { ChatMessage } from '@/components/ChatMessage';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { EmotionIndicator } from '@/components/EmotionIndicator';
@@ -6,8 +7,10 @@ import { WebcamPreview } from '@/components/WebcamPreview';
 import { VoiceControls } from '@/components/VoiceControls';
 import { SettingsModal } from '@/components/SettingsModal';
 import { MessageInput } from '@/components/MessageInput';
-import { Bot } from 'lucide-react';
+import { Bot, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { useAuth } from '@/contexts/AuthContext';
+import { Button } from '@/components/ui/button';
 
 interface Message {
   id: string;
@@ -20,6 +23,8 @@ const STORAGE_KEY = 'emotion-aware-chat-history';
 const BACKEND_URL = '/api'; // Update with your FastAPI backend URL
 
 const Index = () => {
+  const { user, isGuest, guestMessageCount, incrementGuestCount, signOut } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [emotionDetection, setEmotionDetection] = useState(true);
@@ -57,6 +62,20 @@ const Index = () => {
   }, [textSize]);
 
   const sendMessage = async (content: string) => {
+    // Check guest limit
+    if (isGuest) {
+      const canSend = incrementGuestCount();
+      if (!canSend) {
+        toast.error('Guest limit reached. Please sign in to continue.', {
+          action: {
+            label: 'Sign In',
+            onClick: () => navigate('/login'),
+          },
+        });
+        return;
+      }
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -144,6 +163,12 @@ const Index = () => {
     toast.success('Chat history cleared');
   };
 
+  const handleSignOut = async () => {
+    await signOut();
+    navigate('/login');
+    toast.success('Signed out successfully');
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col relative overflow-hidden">
       {/* Animated background gradient */}
@@ -178,10 +203,25 @@ const Index = () => {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   Emotion-Aware Coding Assistant
                 </h1>
-                <p className="text-xs text-muted-foreground">AI-powered coding help with emotion detection</p>
+                <p className="text-xs text-muted-foreground">
+                  {isGuest
+                    ? `Guest Mode (${guestMessageCount}/20 messages used)`
+                    : user?.email || 'AI-powered coding help with emotion detection'}
+                </p>
               </div>
             </div>
-            <VoiceControls onVoiceMessage={handleVoiceMessage} backendUrl={BACKEND_URL} />
+            <div className="flex items-center gap-2">
+              <VoiceControls onVoiceMessage={handleVoiceMessage} backendUrl={BACKEND_URL} />
+              <Button
+                onClick={handleSignOut}
+                variant="ghost"
+                size="icon"
+                className="text-muted-foreground hover:text-primary transition-colors"
+                title="Sign Out"
+              >
+                <LogOut className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
