@@ -7,6 +7,7 @@ import { WebcamPreview } from '@/components/WebcamPreview';
 import { VoiceControls } from '@/components/VoiceControls';
 import { SettingsModal } from '@/components/SettingsModal';
 import { MessageInput } from '@/components/MessageInput';
+import { RobotAvatar } from '@/components/RobotAvatar';
 import { Bot, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,6 +31,8 @@ const Index = () => {
   const [emotionDetection, setEmotionDetection] = useState(true);
   const [textSize, setTextSize] = useState(16);
   const [darkMode, setDarkMode] = useState(true);
+  const [robotState, setRobotState] = useState<'idle' | 'typing' | 'explaining' | 'encouraging'>('idle');
+  const [isUserTyping, setIsUserTyping] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load chat history from localStorage
@@ -85,6 +88,7 @@ const Index = () => {
 
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
+    setRobotState('explaining');
 
     try {
       const response = await fetch(`${BACKEND_URL}/chat`, {
@@ -111,6 +115,7 @@ const Index = () => {
       };
 
       setMessages((prev) => [...prev, assistantMessage]);
+      setRobotState('idle');
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message. Using demo mode.');
@@ -126,6 +131,7 @@ const Index = () => {
       setTimeout(() => {
         setMessages((prev) => [...prev, demoResponse]);
         setIsLoading(false);
+        setRobotState('idle');
       }, 1500);
       return;
     } finally {
@@ -255,10 +261,20 @@ const Index = () => {
         </div>
       </main>
 
+      {/* Robot Avatar */}
+      <RobotAvatar state={robotState} isTyping={isUserTyping} />
+
       {/* Message Input */}
       <footer className="relative border-t border-border/50 backdrop-blur-xl">
         <div className="max-w-5xl mx-auto px-4 py-4">
-          <MessageInput onSendMessage={sendMessage} disabled={isLoading} />
+          <MessageInput 
+            onSendMessage={sendMessage} 
+            disabled={isLoading}
+            onTypingChange={(typing) => {
+              setIsUserTyping(typing);
+              setRobotState(typing ? 'typing' : 'idle');
+            }}
+          />
           {messages.length > 0 && (
             <div className="flex justify-center mt-2">
               <button
