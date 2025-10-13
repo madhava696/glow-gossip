@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Bot, User, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
 import { api } from '@/services/api';
+import { getLatestEmotion, setEmotion } from '@/services/emotionStorage';
 
 interface Message {
   id: string;
@@ -21,7 +22,6 @@ interface Message {
 }
 
 const STORAGE_KEY = 'emotion-aware-chat-history';
-const EMOTION_STORAGE_KEY = 'emotion-data-local';
 
 const Index = () => {
   const { user, isGuest, guestMessageCount, incrementGuestCount, logout } = useAuth();
@@ -78,23 +78,20 @@ const Index = () => {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Store emotion data locally (never send to backend)
-    const emotionData = {
-      timestamp: Date.now(),
-      messageId: userMessage.id,
-      // Add your emotion detection data here
-    };
-    const existingEmotions = JSON.parse(localStorage.getItem(EMOTION_STORAGE_KEY) || '[]');
-    localStorage.setItem(EMOTION_STORAGE_KEY, JSON.stringify([...existingEmotions, emotionData]));
-
     try {
-      const response = await api.sendChatMessage(content, messages);
+      // Get current emotion from local storage
+      const emotion = getLatestEmotion();
       
-      if (response.data) {
+      const response = await api.sendChatMessage({
+        message: content,
+        emotion: emotion,
+      });
+      
+      if (response.reply) {
         const assistantMessage: Message = {
           id: (Date.now() + 1).toString(),
           role: 'assistant',
-          content: response.data.response || response.message || 'Sorry, I could not process your request.',
+          content: response.reply,
           timestamp: Date.now(),
         };
         setMessages((prev) => [...prev, assistantMessage]);
@@ -198,6 +195,7 @@ const Index = () => {
                   {isGuest 
                     ? `Guest Mode: ${guestMessageCount}/20 messages` 
                     : user?.email || 'AI-powered coding help'}
+                  {emotionDetection && ` • Emotion: ${getLatestEmotion()}`}
                 </p>
               </div>
             </div>

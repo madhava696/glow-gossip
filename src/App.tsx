@@ -12,7 +12,7 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-function ProtectedRoute({ children }: { children: React.ReactNode }) {
+function ProtectedRoute({ children, requireAuth = false }: { children: React.ReactNode; requireAuth?: boolean }) {
   const { isAuthenticated, isGuest, isLoading } = useAuth();
 
   if (isLoading) {
@@ -24,6 +24,11 @@ function ProtectedRoute({ children }: { children: React.ReactNode }) {
   }
 
   if (!isAuthenticated && !isGuest) {
+    return <Navigate to="/login" replace />;
+  }
+
+  // Require authenticated user (not guest) for profile page
+  if (requireAuth && !isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
 
@@ -51,7 +56,7 @@ const App = () => (
             <Route
               path="/profile"
               element={
-                <ProtectedRoute>
+                <ProtectedRoute requireAuth={true}>
                   <Profile />
                 </ProtectedRoute>
               }

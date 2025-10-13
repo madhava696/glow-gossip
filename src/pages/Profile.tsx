@@ -1,15 +1,73 @@
+import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import { Bot, Mail, Calendar, MessageSquare, LogOut, ArrowLeft } from 'lucide-react';
+import { Bot, Mail, Calendar, MessageSquare, LogOut, ArrowLeft, Trash2, Key, Lock } from 'lucide-react';
+import { toast } from 'sonner';
+import { api } from '@/services/api';
+import { deleteLocalEmotionData } from '@/services/emotionStorage';
 
 const Profile = () => {
   const { user, isGuest, guestMessageCount, logout } = useAuth();
   const navigate = useNavigate();
+  
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [updateEmail, setUpdateEmail] = useState('');
+  const [updatePassword, setUpdatePassword] = useState('');
+  const [updateSecretKey, setUpdateSecretKey] = useState('');
+  const [deleteConfirmation, setDeleteConfirmation] = useState('');
 
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  const handleUpdateProfile = async () => {
+    if (!updateEmail && !updatePassword && !updateSecretKey) {
+      toast.error('Please fill in at least one field to update');
+      return;
+    }
+
+    setIsUpdating(true);
+    try {
+      const updateData: any = {};
+      if (updateEmail) updateData.email = updateEmail;
+      if (updatePassword) updateData.password = updatePassword;
+      if (updateSecretKey) updateData.secret_key = updateSecretKey;
+
+      const response = await api.updateProfile(updateData);
+      
+      if (response.error) {
+        toast.error(response.error);
+      } else {
+        toast.success('Profile updated successfully');
+        setUpdateEmail('');
+        setUpdatePassword('');
+        setUpdateSecretKey('');
+      }
+    } catch (error) {
+      toast.error('Failed to update profile');
+    } finally {
+      setIsUpdating(false);
+    }
+  };
+
+  const handleDeleteEmotionData = async () => {
+    if (deleteConfirmation !== 'DELETE-FOREVER') {
+      toast.error('Please type DELETE-FOREVER to confirm');
+      return;
+    }
+
+    try {
+      deleteLocalEmotionData();
+      await api.deleteEmotionData();
+      toast.success('Emotion data deleted successfully');
+      setDeleteConfirmation('');
+    } catch (error) {
+      toast.error('Failed to acknowledge deletion');
+    }
   };
 
   return (
@@ -101,6 +159,95 @@ const Profile = () => {
                     <div className="flex-1">
                       <h3 className="font-semibold text-foreground mb-1">Access Level</h3>
                       <p className="text-sm text-muted-foreground">Unlimited messages</p>
+                    </div>
+                  </div>
+
+                  {/* Update Profile Section */}
+                  <div className="p-4 rounded-xl bg-background/50 border border-border/50">
+                    <h3 className="font-semibold text-foreground mb-4">Update Profile</h3>
+                    <div className="space-y-3">
+                      <div>
+                        <Label htmlFor="updateEmail" className="text-foreground/80">New Email</Label>
+                        <div className="relative mt-1">
+                          <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="updateEmail"
+                            type="email"
+                            placeholder="new@example.com"
+                            value={updateEmail}
+                            onChange={(e) => setUpdateEmail(e.target.value)}
+                            className="pl-10 bg-background/50 border-border/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="updatePassword" className="text-foreground/80">New Password</Label>
+                        <div className="relative mt-1">
+                          <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="updatePassword"
+                            type="password"
+                            placeholder="••••••••"
+                            value={updatePassword}
+                            onChange={(e) => setUpdatePassword(e.target.value)}
+                            className="pl-10 bg-background/50 border-border/50"
+                          />
+                        </div>
+                      </div>
+
+                      <div>
+                        <Label htmlFor="updateSecretKey" className="text-foreground/80">New Secret Key</Label>
+                        <div className="relative mt-1">
+                          <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                          <Input
+                            id="updateSecretKey"
+                            type="password"
+                            placeholder="New secret key"
+                            value={updateSecretKey}
+                            onChange={(e) => setUpdateSecretKey(e.target.value)}
+                            className="pl-10 bg-background/50 border-border/50"
+                          />
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={handleUpdateProfile}
+                        disabled={isUpdating}
+                        className="w-full"
+                      >
+                        {isUpdating ? 'Updating...' : 'Update Profile'}
+                      </Button>
+                    </div>
+                  </div>
+
+                  {/* Delete Emotion Data Section */}
+                  <div className="p-4 rounded-xl bg-destructive/10 border border-destructive/30">
+                    <h3 className="font-semibold text-foreground mb-2 flex items-center gap-2">
+                      <Trash2 className="w-4 h-4" />
+                      Delete Local Emotion Data
+                    </h3>
+                    <p className="text-sm text-muted-foreground mb-3">
+                      This will permanently delete all emotion data stored locally on this device.
+                      Type <strong>DELETE-FOREVER</strong> to confirm.
+                    </p>
+                    <div className="space-y-2">
+                      <Input
+                        type="text"
+                        placeholder="Type DELETE-FOREVER"
+                        value={deleteConfirmation}
+                        onChange={(e) => setDeleteConfirmation(e.target.value)}
+                        className="bg-background/50 border-border/50"
+                      />
+                      <Button
+                        variant="destructive"
+                        onClick={handleDeleteEmotionData}
+                        disabled={deleteConfirmation !== 'DELETE-FOREVER'}
+                        className="w-full"
+                      >
+                        <Trash2 className="w-4 h-4 mr-2" />
+                        Delete Emotion Data
+                      </Button>
                     </div>
                   </div>
                 </>
