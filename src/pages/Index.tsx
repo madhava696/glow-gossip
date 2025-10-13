@@ -1,4 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { ChatMessage } from '@/components/ChatMessage';
 import { TypingIndicator } from '@/components/TypingIndicator';
 import { EmotionIndicator } from '@/components/EmotionIndicator';
@@ -6,8 +8,10 @@ import { WebcamPreview } from '@/components/WebcamPreview';
 import { VoiceControls } from '@/components/VoiceControls';
 import { SettingsModal } from '@/components/SettingsModal';
 import { MessageInput } from '@/components/MessageInput';
-import { Bot } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Bot, User, LogOut } from 'lucide-react';
 import { toast } from 'sonner';
+import { api } from '@/services/api';
 
 interface Message {
   id: string;
@@ -17,9 +21,11 @@ interface Message {
 }
 
 const STORAGE_KEY = 'emotion-aware-chat-history';
-const BACKEND_URL = '/api'; // Update with your FastAPI backend URL
+const EMOTION_STORAGE_KEY = 'emotion-data-local';
 
 const Index = () => {
+  const { user, isGuest, guestMessageCount, incrementGuestCount, logout } = useAuth();
+  const navigate = useNavigate();
   const [messages, setMessages] = useState<Message[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [emotionDetection, setEmotionDetection] = useState(true);
@@ -57,6 +63,11 @@ const Index = () => {
   }, [textSize]);
 
   const sendMessage = async (content: string) => {
+    // Check guest limit
+    if (isGuest && !incrementGuestCount()) {
+      return;
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -67,31 +78,29 @@ const Index = () => {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
+    // Store emotion data locally (never send to backend)
+    const emotionData = {
+      timestamp: Date.now(),
+      messageId: userMessage.id,
+      // Add your emotion detection data here
+    };
+    const existingEmotions = JSON.parse(localStorage.getItem(EMOTION_STORAGE_KEY) || '[]');
+    localStorage.setItem(EMOTION_STORAGE_KEY, JSON.stringify([...existingEmotions, emotionData]));
+
     try {
-      const response = await fetch(`${BACKEND_URL}/chat`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          message: content,
-          history: messages,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to get response from backend');
+      const response = await api.sendChatMessage(content, messages);
+      
+      if (response.data) {
+        const assistantMessage: Message = {
+          id: (Date.now() + 1).toString(),
+          role: 'assistant',
+          content: response.data.response || response.message || 'Sorry, I could not process your request.',
+          timestamp: Date.now(),
+        };
+        setMessages((prev) => [...prev, assistantMessage]);
+      } else {
+        throw new Error(response.error || 'Failed to get response');
       }
-
-      const data = await response.json();
-      const assistantMessage: Message = {
-        id: (Date.now() + 1).toString(),
-        role: 'assistant',
-        content: data.response || 'Sorry, I could not process your request.',
-        timestamp: Date.now(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
     } catch (error) {
       console.error('Error sending message:', error);
       toast.error('Failed to send message. Using demo mode.');
@@ -119,8 +128,10 @@ const Index = () => {
     formData.append('audio', audioBlob, 'recording.wav');
 
     try {
-      const response = await fetch(`${BACKEND_URL}/voice`, {
+      const token = localStorage.getItem('jwt_token');
+      const response = await fetch('http://127.0.0.1:8000/api/voice', {
         method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
       });
 
@@ -136,6 +147,11 @@ const Index = () => {
       console.error('Error processing voice message:', error);
       toast.error('Voice processing unavailable');
     }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
   };
 
   const clearHistory = () => {
@@ -178,10 +194,32 @@ const Index = () => {
                 <h1 className="text-xl font-bold bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent">
                   Emotion-Aware Coding Assistant
                 </h1>
-                <p className="text-xs text-muted-foreground">AI-powered coding help with emotion detection</p>
+                <p className="text-xs text-muted-foreground">
+                  {isGuest 
+                    ? `Guest Mode: ${guestMessageCount}/20 messages` 
+                    : user?.email || 'AI-powered coding help'}
+                </p>
               </div>
             </div>
-            <VoiceControls onVoiceMessage={handleVoiceMessage} backendUrl={BACKEND_URL} />
+            <div className="flex items-center gap-2">
+              <VoiceControls onVoiceMessage={handleVoiceMessage} backendUrl="http://127.0.0.1:8000" />
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/profile')}
+                title="Profile"
+              >
+                <User className="w-5 h-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={handleLogout}
+                title="Logout"
+              >
+                <LogOut className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>
