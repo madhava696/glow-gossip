@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react';
-import { Smile } from 'lucide-react';
+import { Activity } from 'lucide-react';
+import { getLatestEmotion } from '@/services/emotionStorage';
 
 interface EmotionIndicatorProps {
   enabled: boolean;
+  currentEmotion?: string;
+  confidence?: number;
 }
 
 const emotionEmojis: Record<string, string> = {
@@ -15,39 +18,52 @@ const emotionEmojis: Record<string, string> = {
   disgusted: '🤢',
 };
 
-export const EmotionIndicator = ({ enabled }: EmotionIndicatorProps) => {
+export const EmotionIndicator = ({ 
+  enabled, 
+  currentEmotion, 
+  confidence 
+}: EmotionIndicatorProps) => {
   const [emotion, setEmotion] = useState<string>('neutral');
-  const [confidence, setConfidence] = useState<number>(0);
+  const [conf, setConf] = useState<number>(0);
 
   useEffect(() => {
     if (!enabled) return;
 
-    // Placeholder: Connect to backend /video_feed endpoint for real emotion data
-    // For now, simulate emotion detection
     const interval = setInterval(() => {
-      const emotions = Object.keys(emotionEmojis);
-      const randomEmotion = emotions[Math.floor(Math.random() * emotions.length)];
-      setEmotion(randomEmotion);
-      setConfidence(Math.floor(Math.random() * 30) + 70); // 70-100%
-    }, 3000);
+      if (!currentEmotion) {
+        const storedEmotion = getLatestEmotion();
+        setEmotion(storedEmotion);
+      }
+    }, 1000);
 
     return () => clearInterval(interval);
-  }, [enabled]);
+  }, [enabled, currentEmotion]);
+
+  useEffect(() => {
+    if (currentEmotion) {
+      setEmotion(currentEmotion);
+    }
+    if (confidence !== undefined) {
+      setConf(Math.round(confidence));
+    }
+  }, [currentEmotion, confidence]);
 
   if (!enabled) return null;
 
   return (
     <div className="fixed top-4 right-4 z-50 glass-effect rounded-xl px-4 py-3 border-primary/30 glow-primary animate-fade-in">
       <div className="flex items-center gap-3">
-        <Smile className="w-5 h-5 text-primary" />
+        <Activity className="w-5 h-5 text-primary animate-pulse" />
         <div>
           <div className="text-sm font-medium flex items-center gap-2">
-            <span>{emotionEmojis[emotion]}</span>
+            <span>{emotionEmojis[emotion] || '😐'}</span>
             <span className="capitalize text-foreground">{emotion}</span>
           </div>
-          <div className="text-xs text-muted-foreground">
-            Confidence: {confidence}%
-          </div>
+          {conf > 0 && (
+            <div className="text-xs text-muted-foreground">
+              Confidence: {conf}%
+            </div>
+          )}
         </div>
       </div>
     </div>

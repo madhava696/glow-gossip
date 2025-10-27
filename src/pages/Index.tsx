@@ -40,6 +40,8 @@ const Index = () => {
   const [darkMode, setDarkMode] = useState(true);
   const [robotEmotion, setRobotEmotion] = useState<EmotionState>('neutral');
   const [robotBehavior, setRobotBehavior] = useState<BehaviorState>('idle');
+  const [realtimeEmotion, setRealtimeEmotion] = useState<string>('neutral');
+  const [emotionConfidence, setEmotionConfidence] = useState<number>(0);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load chat history from localStorage
@@ -71,6 +73,12 @@ const Index = () => {
     document.documentElement.style.fontSize = `${textSize}px`;
   }, [textSize]);
 
+  const handleEmotionUpdate = (emotion: string, confidence: number) => {
+    setRealtimeEmotion(emotion);
+    setEmotionConfidence(confidence);
+    setRobotEmotion(emotion as EmotionState);
+  };
+
   // NEW: Streaming message handler
   const sendMessage = async (content: string) => {
     // Check guest limit
@@ -88,8 +96,8 @@ const Index = () => {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Get current emotion from local storage BEFORE try block
-    const emotion = getLatestEmotion();
+    // Use realtime emotion or fallback to storage
+    const emotion = realtimeEmotion || getLatestEmotion();
     setRobotEmotion(emotion as EmotionState);
     setRobotBehavior('analyzing');
 
@@ -281,10 +289,17 @@ const Index = () => {
       />
 
       {/* Emotion Indicator */}
-      <EmotionIndicator enabled={emotionDetection} />
+      <EmotionIndicator 
+        enabled={emotionDetection}
+        currentEmotion={realtimeEmotion}
+        confidence={emotionConfidence}
+      />
 
       {/* Webcam Preview */}
-      <WebcamPreview enabled={emotionDetection} />
+      <WebcamPreview 
+        enabled={emotionDetection} 
+        onEmotionUpdate={handleEmotionUpdate}
+      />
 
       {/* Header */}
       <header className="relative border-b border-border/50 backdrop-blur-xl">

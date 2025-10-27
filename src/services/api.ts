@@ -42,6 +42,11 @@ export interface StreamChunk {
   error?: boolean;
 }
 
+export interface EmotionResponse {
+  emotion: string;
+  confidence: number;
+}
+
 export interface ApiResponse<T = any> {
   message?: string;
   token?: string;
@@ -134,6 +139,30 @@ class ApiService {
     }
     
     return response.json();
+  }
+
+  async sendFrame(base64Frame: string): Promise<EmotionResponse> {
+    const response = await fetch(`${API_BASE_URL}/api/emotion_face/frame`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...this.getAuthHeader(),
+      },
+      body: JSON.stringify({ image: base64Frame }),
+    });
+    
+    if (!response.ok) {
+      throw new Error('Failed to analyze emotion');
+    }
+    
+    return response.json();
+  }
+
+  async stopEmotionDetection(): Promise<void> {
+    await fetch(`${API_BASE_URL}/api/emotion_face/stop`, {
+      method: 'GET',
+      headers: this.getAuthHeader(),
+    });
   }
 }
 
