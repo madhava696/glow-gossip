@@ -40,8 +40,7 @@ const Index = () => {
   const [darkMode, setDarkMode] = useState(true);
   const [robotEmotion, setRobotEmotion] = useState<EmotionState>('neutral');
   const [robotBehavior, setRobotBehavior] = useState<BehaviorState>('idle');
-  const [realtimeEmotion, setRealtimeEmotion] = useState<string>('neutral');
-  const [emotionConfidence, setEmotionConfidence] = useState<number>(0);
+  const [isDetectionActive, setIsDetectionActive] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // Load chat history from localStorage
@@ -74,9 +73,29 @@ const Index = () => {
   }, [textSize]);
 
   const handleEmotionUpdate = (emotion: string, confidence: number) => {
-    setRealtimeEmotion(emotion);
-    setEmotionConfidence(confidence);
     setRobotEmotion(emotion as EmotionState);
+  };
+
+  const handleStartDetection = async () => {
+    try {
+      await api.startEmotionDetection();
+      setIsDetectionActive(true);
+      toast.success('Emotion detection started');
+    } catch (error) {
+      console.error('Failed to start detection:', error);
+      toast.error('Failed to start emotion detection');
+    }
+  };
+
+  const handleStopDetection = async () => {
+    try {
+      await api.stopEmotionDetection();
+      setIsDetectionActive(false);
+      toast.success('Emotion detection stopped');
+    } catch (error) {
+      console.error('Failed to stop detection:', error);
+      toast.error('Failed to stop emotion detection');
+    }
   };
 
   // NEW: Streaming message handler
@@ -96,8 +115,8 @@ const Index = () => {
     setMessages((prev) => [...prev, userMessage]);
     setIsLoading(true);
 
-    // Use realtime emotion or fallback to storage
-    const emotion = realtimeEmotion || getLatestEmotion();
+    // Use stored emotion
+    const emotion = getLatestEmotion();
     setRobotEmotion(emotion as EmotionState);
     setRobotBehavior('analyzing');
 
@@ -290,15 +309,16 @@ const Index = () => {
 
       {/* Emotion Indicator */}
       <EmotionIndicator 
-        enabled={emotionDetection}
-        currentEmotion={realtimeEmotion}
-        confidence={emotionConfidence}
+        enabled={emotionDetection && isDetectionActive}
+        onEmotionUpdate={handleEmotionUpdate}
       />
 
       {/* Webcam Preview */}
       <WebcamPreview 
-        enabled={emotionDetection} 
-        onEmotionUpdate={handleEmotionUpdate}
+        enabled={emotionDetection}
+        isActive={isDetectionActive}
+        onStart={handleStartDetection}
+        onStop={handleStopDetection}
       />
 
       {/* Header */}
@@ -322,6 +342,15 @@ const Index = () => {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {emotionDetection && (
+                <Button
+                  variant={isDetectionActive ? "destructive" : "default"}
+                  size="sm"
+                  onClick={isDetectionActive ? handleStopDetection : handleStartDetection}
+                >
+                  {isDetectionActive ? 'Stop Detection' : 'Start Detection'}
+                </Button>
+              )}
               <VoiceControls onVoiceMessage={handleVoiceMessage} backendUrl="http://127.0.0.1:8000" />
               <Button
                 variant="ghost"

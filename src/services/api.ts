@@ -1,4 +1,5 @@
-const API_BASE_URL = 'http://127.0.0.1:8000';
+export const BACKEND_URL = 'http://127.0.0.1:8000';
+const API_BASE_URL = BACKEND_URL;
 
 export interface RegisterData {
   email: string;
@@ -141,21 +142,28 @@ class ApiService {
     return response.json();
   }
 
-  async sendFrame(base64Frame: string): Promise<EmotionResponse> {
-    const response = await fetch(`${API_BASE_URL}/api/emotion_face/frame`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        ...this.getAuthHeader(),
-      },
-      body: JSON.stringify({ image: base64Frame }),
+  async startEmotionDetection(): Promise<void> {
+    await fetch(`${API_BASE_URL}/api/emotion_face/start`, {
+      method: 'GET',
+      headers: this.getAuthHeader(),
     });
-    
-    if (!response.ok) {
-      throw new Error('Failed to analyze emotion');
+  }
+
+  async getLatestEmotion(): Promise<EmotionResponse> {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/emotion_face/frame/latest`, {
+        method: 'GET',
+        headers: this.getAuthHeader(),
+      });
+      
+      if (!response.ok) {
+        return { emotion: 'neutral', confidence: 0 };
+      }
+      
+      return response.json();
+    } catch {
+      return { emotion: 'neutral', confidence: 0 };
     }
-    
-    return response.json();
   }
 
   async stopEmotionDetection(): Promise<void> {
